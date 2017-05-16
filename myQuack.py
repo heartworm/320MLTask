@@ -1,5 +1,6 @@
 import csv
 import numpy as np
+import random
 
 '''
 
@@ -24,7 +25,6 @@ def my_team():
     
     '''
     return [ (9286675, 'Shravan', 'Lal') ]
-    # raise NotImplementedError()
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
@@ -47,15 +47,18 @@ def prepare_dataset(dataset_path):
 	X,y
     '''
     X_pylist = []
-    Y_pylist = []
+    y_pylist = []
 
     with open(dataset_path, newline='') as data_file:
         data_reader = csv.reader(data_file)
         for row in data_reader:
             X_pylist.append([float(num) for num in row[2:]]) #slice from 2nd index
-            Y_pylist.append(1 if row[1] == 'M' else 0) #1 if malignant else 0
+            y_pylist.append(1 if row[1] == 'M' else 0) #1 if malignant else 0
 
-    return np.array(X_pylist), np.array(Y_pylist)
+    random.shuffle(X_pylist)
+    random.shuffle(y_pylist)
+
+    return np.array(X_pylist), np.array(y_pylist)
     pass
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -125,8 +128,20 @@ def build_SVM_classifier(X_training, y_training):
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
 if __name__ == "__main__":
-    print(prepare_dataset("./medical_records.data"))
-    # call your functions here
+    TRAINING_SETASIDE = 0.75
+
+    X, y = prepare_dataset("medical_records.data")
+
+    num_points = X.shape[0]
+    training_num = round(num_points * TRAINING_SETASIDE)
+
+    X_training = X[0:training_num]
+    X_testing = X[training_num:num_points]
+
+    Y_training = X[0:training_num]
+    Y_testing = X[training_num:num_points]
+
+    print(X_training.shape)
     
 
 
