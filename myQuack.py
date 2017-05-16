@@ -1,6 +1,11 @@
 import csv
 import numpy as np
 import random
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.svm import SVC
+from sklearn.naive_bayes import GaussianNB
+from sklearn.tree import DecisionTreeClassifier
+import sklearn as sk
 
 '''
 
@@ -59,7 +64,7 @@ def prepare_dataset(dataset_path):
     random.shuffle(y_pylist)
 
     return np.array(X_pylist), np.array(y_pylist)
-    pass
+
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
@@ -75,7 +80,11 @@ def build_NB_classifier(X_training, y_training):
 	clf : the classifier built in this function
     '''
     ##         "INSERT YOUR CODE HERE"    
-    raise NotImplementedError()
+#    raise NotImplementedError()
+
+    classifier = GaussianNB()
+    classifier.fit(X_training, y_training)
+    return classifier
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
@@ -91,7 +100,13 @@ def build_DT_classifier(X_training, y_training):
 	clf : the classifier built in this function
     '''
     ##         "INSERT YOUR CODE HERE"    
-    raise NotImplementedError()
+#    raise NotImplementedError()
+
+
+    classifier = DecisionTreeClassifier()
+    classifier.fit(X_training, y_training)
+    return classifier
+    
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
@@ -107,7 +122,17 @@ def build_NN_classifier(X_training, y_training):
 	clf : the classifier built in this function
     '''
     ##         "INSERT YOUR CODE HERE"    
-    raise NotImplementedError()
+#    raise NotImplementedError()
+    
+    k = 20 #number of neighbours to consider
+    #'uniform' or 'distance' to prioritise neighbours votes based on proximity
+    weighting = 'distance'
+    
+    classifier = KNeighborsClassifier(k, weights = weighting)
+    classifier.fit(X_training, y_training)
+    return classifier
+    
+    
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
@@ -123,7 +148,12 @@ def build_SVM_classifier(X_training, y_training):
 	clf : the classifier built in this function
     '''
     ##         "INSERT YOUR CODE HERE"    
-    raise NotImplementedError()
+#    raise NotImplementedError()
+
+    classifier = SVC()
+    classifier.fit(X_training, y_training)
+    return classifier
+    
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
@@ -138,10 +168,15 @@ if __name__ == "__main__":
     X_training = X[0:training_num]
     X_testing = X[training_num:num_points]
 
-    Y_training = X[0:training_num]
-    Y_testing = X[training_num:num_points]
+    y_training = y[0:training_num]
+    y_testing = y[training_num:num_points]
 
-    print(X_training.shape)
+    classifier_NN = build_NN_classifier(X_training, y_training)
+    classifier_SVM = build_SVM_classifier(X_training, y_training)
+    classifier_DT = build_DT_classifier(X_training, y_training)
+    classifier_NB = build_NB_classifier(X_training, y_training)
+    pred_testing = classifier_NN.predict(X_testing)
+    print("accuracy ", sk.metrics.accuracy_score(y_testing,pred_testing))
     
 
 
