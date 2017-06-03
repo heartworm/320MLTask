@@ -5,6 +5,7 @@ from sklearn.neighbors import KNeighborsClassifier
 from sklearn.svm import SVC
 from sklearn.naive_bayes import GaussianNB
 from sklearn.tree import DecisionTreeClassifier
+from sklearn.model_selection import train_test_split, KFold
 import sklearn as sk
 import matplotlib.pyplot as plt
 '''
@@ -66,7 +67,7 @@ def prepare_dataset(dataset_path):
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-def build_NB_classifier(X_training, y_training):
+def build_NB_classifier(X_training, y_training, parameter=None): #third arg to conform to the same scheme as others
     '''  
     Build a Naive Bayes classifier based on the training set X_training, y_training.
 
@@ -97,12 +98,50 @@ def build_DT_classifier(X_training, y_training,  max_depth=None):
     @return
 	clf : the classifier built in this function
     '''
-
     # Decision tree has random components in algorithm, seed to 123456 as well
     classifier = DecisionTreeClassifier(max_depth = max_depth, random_state=123456)
     classifier.fit(X_training, y_training)
     return classifier
     
+def cv_classifier(X, y, clf_builder, param_values): # perform cross validation on a classifier
+    '''
+    Perform Cross validation of an SKLearn classifier given several hyperparameter values, returning training
+    and test accuracy for each value. 
+    
+    :param X: ndarray with features, with each row being a training point
+    :param y: ndarray with target categories corresponding to rows of X
+    :param clf_builder: function that returns an SKLearn classifier given arguments (X, Y, parameter_value) 
+    :param param_values: sequence of numbers to test as parameter_value passed into clf_builder. 
+    :return (performance in training set, performance in validation set): both lists with indices corresponding to
+             values in param_values, containing accuracy of classifier at a given parameter value. 
+    '''
+
+
+    perf_training = []
+    perf_validation = []
+
+    for param_value in param_values: #cycle through parameter values to test
+        cur_perf_training = 0 #sum of accuracies to be divided later on, to get average performance over KFolds
+        cur_perf_validation = 0
+
+        num_splits = 3
+        kf = KFold(n_splits=num_splits)
+
+        for ind_training, ind_validation in kf.split(X):
+            X_training = X[ind_training]
+            X_validation = X[ind_validation]
+            y_training = y[ind_training]
+            y_validation = y[ind_validation]
+
+            # Create the classifier with selected parameter
+            classifier = clf_builder(X_training, y_training, param_value)
+            cur_perf_training += get_accuracy(classifier, X_training, y_training)
+            cur_perf_validation += get_accuracy(classifier, X_validation, y_validation)
+
+        perf_training.append(cur_perf_training / num_splits)
+        perf_validation.append(cur_perf_validation / num_splits)
+
+    return perf_training, perf_validation
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
@@ -139,7 +178,6 @@ def build_SVM_classifier(X_training, y_training, C_value=1.0):
 	clf : the classifier built in this function
     '''
 
-
     classifier = SVC(kernel='linear', C=C_value)
     classifier.fit(X_training, y_training)
     return classifier
@@ -153,107 +191,91 @@ def get_accuracy(classifier, X_testing, y_testing):
 
 
 if __name__ == "__main__":
-    TRAINING_SETASIDE = 0.8 # Set aside 80% of the dataset to training
-    VALIDATION_SETASIDE = 0.1 # use 10% for cross-validation and choosing hyperparameters
+    TESTING_SETASIDE = 0.1 # Set aside 10% of the set for final testing.
 
     X, y = prepare_dataset("medical_records.data") # Get the X and y datasets
-
-
-    # Randomizing the dataset ----------------------
-    np.random.seed(123451268) # Seed the RNG so that we get predictable results.
-    dataset_mat = np.concatenate([X, y[:, np.newaxis]], 1) # Join X any Y together so that they can be shuffled as one
-    np.random.shuffle(dataset_mat) # Shuffle the joined ndarray in place to remove any ordering effects
-    X_shuffled = dataset_mat[:, 0:-1] # Split them into X and Y once more, noticing that the last column is the Y vector
-    y_shuffled = dataset_mat[:, -1]
+    X_training, X_testing, y_training, y_testing = sk.model_selection.train_test_split(X, y, test_size=TESTING_SETASIDE,
+                                                                                       random_state=123456)
 
 
 
-    num_points = X.shape[0] # The number of samples is the number of rows in the X vector
-    num_training = math.floor(num_points * TRAINING_SETASIDE) # Convert the setaside fractions to actual sample counts
-    num_validation = math.floor(num_points * VALIDATION_SETASIDE)
-
-    # Set aside the first num_training for training, then the next num_validation for validation
-    # then the rest for testing. Apply to both X and y
-    X_training = X_shuffled[0:num_training]
-    X_validation = X_shuffled[num_training:num_training + num_validation]
-    X_testing = X_shuffled[num_training + num_validation:]
-
-    y_training = y_shuffled[0:num_training]
-    y_validation = y_shuffled[num_training:num_training+num_validation]
-    y_testing = y_shuffled[num_training + num_validation:]
+    # # Randomizing the dataset ----------------------
+    # np.random.seed(123451268) # Seed the RNG so that we get predictable results.
+    # dataset_mat = np.concatenate([X, y[:, np.newaxis]], 1) # Join X any Y together so that they can be shuffled as one
+    # np.random.shuffle(dataset_mat) # Shuffle the joined ndarray in place to remove any ordering effects
+    # X_shuffled = dataset_mat[:, 0:-1] # Split them into X and Y once more, noticing that the last column is the Y vector
+    # y_shuffled = dataset_mat[:, -1]
+    #
+    #
+    #
+    # num_points = X.shape[0] # The number of samples is the number of rows in the X vector
+    # num_training = math.floor(num_points * TRAINING_SETASIDE) # Convert the setaside fractions to actual sample counts
+    # num_validation = math.floor(num_points * VALIDATION_SETASIDE)
+    #
+    # # Set aside the first num_training for training, then the next num_validation for validation
+    # # then the rest for testing. Apply to both X and y
+    # X_training = X_shuffled[0:num_training]
+    # X_validation = X_shuffled[num_training:num_training + num_validation]
+    # X_testing = X_shuffled[num_training + num_validation:]
+    #
+    # y_training = y_shuffled[0:num_training]
+    # y_validation = y_shuffled[num_training:num_training+num_validation]
+    # y_testing = y_shuffled[num_training + num_validation:]
 
     # Building graph for Nearest Neighbors Parameters -------------------------------------------
 
     # Lists to build a graph of training vs validation accuracy as the chosen hyperparameter changes.
-    perf_NN_validation = [] # Accuracy values as floats from 0-1, these are heights of the graph points
-    perf_NN_training = [] # Same as perf_NN_training
-    perf_NN_values = [] # Tested values of the parameter, displayed on the X axis
+    # Accuracy values as floats from 0-1, these are heights of the graph points
+    perf_NN_values = list(range(1,26)) # Tested values of the parameter, displayed on the X axis
+    perf_NN_training, perf_NN_validation = cv_classifier(X_training, y_training, build_NN_classifier, perf_NN_values)
 
     fig_NN = plt.figure() # Create a figure window
-    for n_neighbors in range(1,26): # Range encompasses tested values for the parameter
-        # Create the classifier with selected parameter
-        classifier = build_NN_classifier(X_training, y_training, n_neighbors=n_neighbors)
-        # Add to the graph lists
-        perf_NN_values.append(n_neighbors)
-        perf_NN_training.append(get_accuracy(classifier, X_training, y_training))
-        perf_NN_validation.append(get_accuracy(classifier, X_validation, y_validation))
     plt.plot(perf_NN_values, perf_NN_training, 'b.--', label="Training Set Accuracy")
     plt.plot(perf_NN_values, perf_NN_validation, 'r.--', label="Validation Set Accuracy")
     plt.title("Cross-Validation of K-Nearest Neighbors Classifier")
     plt.xlabel("Number of Considered Neighbors (K)")
     plt.ylabel("Accuracy")
-    plt.xticks(range(1,26))
+    plt.xticks(perf_NN_values)
     plt.legend()
 
 
     # Building graph for parameters for Decision Tree Classifier. See Nearest Neighbors graph for explanation
 
-    perf_DT_validation = []
-    perf_DT_training = []
-    perf_DT_values = []
+    perf_DT_values = list(range(1,11))
+    perf_DT_training, perf_DT_validation = cv_classifier(X_training, y_training, build_DT_classifier, perf_DT_values)
     fig_DT = plt.figure()
-    for max_depth in range(1, 11):
-        classifier = build_DT_classifier(X_training, y_training, max_depth=max_depth)
-        perf_DT_values.append(max_depth)
-        perf_DT_training.append(get_accuracy(classifier, X_training, y_training))
-        perf_DT_validation.append(get_accuracy(classifier, X_validation, y_validation))
     plt.plot(perf_DT_values, perf_DT_training, 'b.--', label="Training Set Accuracy")
     plt.plot(perf_DT_values, perf_DT_validation, 'r.--', label="Validation Set Accuracy")
     plt.title("Cross-Validation of Decision Tree Classifier")
     plt.xlabel("Maximum Depth of Decision Tree")
     plt.ylabel("Accuracy")
-    plt.xticks(range(1,11))
+    plt.xticks(perf_DT_values)
     plt.legend()
 
     # Building graph for SVM parameters, see Nearest Neighbors graph for explanation
 
-    perf_SVM_validation = []
-    perf_SVM_training = []
-    perf_SVM_values = []
-    fig_SVM = plt.figure()
-    for C_value in [2**i for i in range(11)]:
-        classifier = build_SVM_classifier(X_training, y_training, C_value = C_value)
-        perf_SVM_values.append(C_value)
-        perf_SVM_training.append(get_accuracy(classifier, X_training, y_training))
-        perf_SVM_validation.append(get_accuracy(classifier, X_validation, y_validation))
-    plt.plot(perf_SVM_values, perf_SVM_training, 'b.--', label="Training Set Accuracy")
-    plt.plot(perf_SVM_values, perf_SVM_validation, 'r.--', label="Validation Set Accuracy")
-    plt.title("Cross-Validation of SVM Classifier")
-    plt.xlabel("Value of Error Penalty Coefficient C")
-    plt.ylabel("Accuracy")
-    plt.legend()
+    # perf_SVM_values = [2**i for i in range(11)]
+    # perf_SVM_training, perf_SVM_validation = cv_classifier(X_training, y_training, build_SVM_classifier, perf_SVM_values)
+    #
+    # fig_SVM = plt.figure()
+    # plt.plot(perf_SVM_values, perf_SVM_training, 'b.--', label="Training Set Accuracy")
+    # plt.plot(perf_SVM_values, perf_SVM_validation, 'r.--', label="Validation Set Accuracy")
+    # plt.title("Cross-Validation of SVM Classifier")
+    # plt.xlabel("Value of Error Penalty Coefficient C")
+    # plt.ylabel("Accuracy")
+    # plt.legend()
 
 
-
-    classifier_NN = build_NN_classifier(X_training, y_training)
-    classifier_SVM = build_SVM_classifier(X_training, y_training)
-    classifier_DT = build_DT_classifier(X_training, y_training)
-    classifier_NB = build_NB_classifier(X_training, y_training)
-
-    print("Accuracy on Testing Data ------------------")
-    print("Accuracy of NN", get_accuracy(classifier_NN, X_testing, y_testing))
-    print("Accuracy of SVM", get_accuracy(classifier_SVM, X_testing, y_testing))
-    print("Accuracy of DT", get_accuracy(classifier_DT, X_testing, y_testing))
-    print("Accuracy of NB", get_accuracy(classifier_NB, X_testing, y_testing))
+    #
+    # classifier_NN = build_NN_classifier(X_training, y_training)
+    # classifier_SVM = build_SVM_classifier(X_training, y_training)
+    # classifier_DT = build_DT_classifier(X_training, y_training)
+    # classifier_NB = build_NB_classifier(X_training, y_training)
+    #
+    # print("Accuracy on Testing Data ------------------")
+    # print("Accuracy of NN", get_accuracy(classifier_NN, X_testing, y_testing))
+    # print("Accuracy of SVM", get_accuracy(classifier_SVM, X_testing, y_testing))
+    # print("Accuracy of DT", get_accuracy(classifier_DT, X_testing, y_testing))
+    # print("Accuracy of NB", get_accuracy(classifier_NB, X_testing, y_testing))
 
     plt.show()
